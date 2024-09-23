@@ -1,0 +1,455 @@
+/*
+Gramatica para el Robot:
+Autor: Alejandro Arango
+Modificado por: Silvia Takahashi
+Modificado por: Juan Pablo Morales.
+Agregadas producciones para manejar globos
+Modificado por Silvia Takahashi
+
+
+ **/
+
+
+options 
+{
+  
+	LOOKAHEAD=1; 
+	IGNORE_CASE=true;
+	STATIC = false;
+	
+}
+   
+
+PARSER_BEGIN(Robot)
+
+package uniandes.lym.robot.control;
+
+import uniandes.lym.robot.kernel.*;
+import uniandes.lym.robot.view.Console;
+ 
+import java.awt.Point;
+import java.io.*;
+import java.util.Vector;
+import java.util.LinkedList;
+
+@SuppressWarnings("serial")
+public class Robot 
+{
+
+
+	private RobotWorldDec world;
+	
+	
+	void setWorld(RobotWorld w) {
+		world = (RobotWorldDec) w;	
+	}
+
+	String salida=new String();
+}
+PARSER_END(Robot)
+
+SKIP:
+{
+	" "
+	|	"\r"
+	|	"\t"
+	| "\n"
+}
+
+TOKEN: /* Nombres de Comandos */
+{
+		   <MOV:  "Move" >
+		|  <RIGHT: "RIGHT">
+		|  <PUT: "Put">
+		|  <PICK: "Pick">
+		|  < POP: "Pop" >
+        |  < HOP:  "HOP" >		
+		|  <GO: "GO" >
+}
+
+TOKEN: /* Nombres de Comandos Extras */
+{
+		< NOT : "not" >
+	  | < SAFEEXEC : "safeExe" >
+	  | < WALK  : "walk" >
+	  | < JUMP  : "nump" >
+	  | < DROP  : "drop" >
+	  | < GRAB  : "grab" >
+	  | < LETGO  : "letgo" >
+	  | < TURNTOMY : "turntomy" >
+	  | < TURNTOTHE : "turntothe" >
+	  | < MOVES: "moves" >
+	  | < NOP: "nop" >
+	  | < SIZE: "size" >
+	  | < MYX: "myx" >
+	  | < MYY: "myy">
+	  | < MYCHIPS: "mychips" >
+	  | < MYBALLOONS: "myballoons" >
+	  | < BALLOONSHERE: "balloonshere" >
+	  | < CHIPSHERE: "chipsHere">
+	  | < ROOMFORCHIPS: "roomforchips" >
+	  | < ISBLOCKED: "isBlocked?" >
+	  | < ISFACING: "isFacing?" >
+	  | < ZERO: "zero?">
+}
+
+TOKEN: /* Direcciones */
+{
+  < LEFT : "left" >
+//  | < RIGHT: "right" >
+  | < BACK: "back"  >
+  | < NORTH: "north" >
+  |	< EAST: "east"  >
+  | < SOUTH: "south" >
+  | < WEST: "west" >
+}
+
+TOKEN:
+{
+		<BALLOONS:  "BALLOONS" >
+		| <CHIPS:   "CHIPS"  >
+
+}
+
+TOKEN : {
+    < EXEC : "EXEC" >
+  | < NEW : "NEW" >
+  | < VAR : "VAR" >
+  | < MACRO : "MACRO" >
+  | < IF : "if" >
+  | < THEN : "then" >
+  | < ELSE : "else" >
+  | < FI : "fi" >
+  | < DO : "do" >
+  | < OD : "od" >
+  | < REP : "rep" >
+  | < TIMES : "times" >
+  | < PER : "per" >
+  | < LPAREN : "(">
+  | < RPAREN : ")" >
+  | < LBRACE : "{" >
+  | < RBRACE : "}" >
+  | < COMMA : "," >
+  | < SEMICOLON : ";" >
+  | < EQUALS : "=" >
+  | < NUMBER : (["0"-"9"])+ >
+  | < IDENTIFIER : (["a"-"z", "A"-"Z"])(["a"-"z", "A"-"Z", "0"-"9"])* >
+}
+
+TOKEN :
+{
+		<NUM: (<DIGIT>)+ >
+		|  	<#DIGIT: ["0"-"9"] >
+        
+}
+
+	//boolean command(uniandes.lym.robot.view.Console sistema) :
+	boolean command(Console sistema):
+	{	
+		
+		int x,y;
+		salida=new String(); //TODO COMO EMPIEZO CON EXEC Y DEF
+	}
+
+	
+	{
+		(
+		  (
+		   <RIGHT> <LPAREN > <RPAREN > {world.turnRight();salida = "Command: Turnright";}
+		| 	<MOV>  < LPAREN>x=num() < RPAREN> {world.moveForward(x,false);salida = "Command: Moveforward ";}  
+		| 	<HOP>  < LPAREN>x=num() < RPAREN> {world.moveForward(x,true);salida = "Command:Jumpforward ";}
+		| 	<GO>  < LPAREN>x=num() < COMMA > y=num()< RPAREN> {world.setPostion(x,y);salida = "Command:GO ";}  
+		|  <PUT> < LPAREN> put() < RPAREN>					  			
+		|  <PICK> < LPAREN>get()  < RPAREN>	
+	    |  < POP > < LPAREN>x=num() < RPAREN> {world.popBalloons(x); salida = "Comando:  Pop";}
+	    | executionCommand()  {salida = "Comando:  Execution command";}
+	    | definition() {salida = "Comando: Definition";}
+		)
+
+
+
+		< SEMICOLON >
+
+		{
+		    try {
+	    			 Thread.sleep(900);
+	    	    } catch (InterruptedException e) {
+	    			        System.err.format("IOException: %s%n", e);
+	    		    }
+	    			 
+			sistema.printOutput(salida);
+			return true;
+		})+
+
+    	| <EOF> {return false;} 
+	}
+
+	void put() :
+	{
+		int f=1; //pq = 1?	
+	}
+	{
+		( <CHIPS>    <COMMA> f=num() {world.putChips(f); salida = "Command:  Put Chips"; })
+		|  	  ( <BALLOONS>   <COMMA> f=num() {world.putBalloons(f); salida = "Command:  Put Balloons";})	 
+
+	}
+
+	void get() :
+	{
+		int f=1;	
+	}
+	{
+		( <CHIPS>   <COMMA> f=num() {world.pickChips(f);salida = "Command:  Pick chips";})
+		|  	  ( <BALLOONS>   <COMMA> f=num() {world.grabBalloons(f);salida="Command:  Pick balloons";})	 
+
+	}
+
+
+	/**
+	 * Unsigned decimal number
+	 * @return the corresponding value of the string
+	 * @error  corresponding value is too large
+	 */
+
+	int num() throws Error:
+	{	
+		int total=1;
+	}
+	{
+		<NUM>
+		{
+			try 
+			{
+				total = Integer.parseInt(token.image);
+			} 
+			catch (NumberFormatException ee) 
+			{
+				throw new Error("Number out of bounds: "+token.image+" !!");
+			}
+			return total;
+		}
+	}
+
+// =================================================================================
+// EXEC
+// =================================================================================
+
+void executionCommand(): {
+} {
+ < EXEC > block()
+}
+
+// =================================================================================
+// DEFINITION
+// =================================================================================
+
+void definition(): {
+} {
+ 	< NEW > (variableDefinition() | macroDefinition())
+}
+
+// =================================================================================
+// BLOCKS
+// =================================================================================
+
+void block(): {}
+{
+	< LBRACE > (instruction())+ < RBRACE >
+}
+
+void instruction(): { }
+{
+	comando() | controlStructure()
+}
+
+// =================================================================================
+// COMMANDS
+// =================================================================================
+
+void comando(): { }
+{
+	variableDefinition()
+	| macroInvocation()
+	| turnToMy()
+	| turnToThe()
+	| simpleCommand()
+	| moves()
+	| nop()
+	| safeExe()
+}
+
+void simpleCommand(): { }
+{
+	(< WALK > | < JUMP > | < DROP > | < PICK > | < GRAB > | < LETGO > | < POP >)
+	<LPAREN > value() < RPAREN>
+}
+
+void turnToMy(): { }
+{
+	< TURNTOMY > <LPAREN > direction() < RPAREN >
+}
+
+void turnToThe(): { }
+{
+	< TURNTOTHE > <LPAREN > orientation() < RPAREN > 
+}
+
+void moves(): { }
+{
+	< MOVES > <LPAREN > directions() < RPAREN >
+}
+
+
+void nop(): { }
+{
+	< NOP > 
+}
+
+void safeExe(): { }
+{
+	< SAFEEXEC > <LPAREN > simpleCommand() <RPAREN >
+}
+
+// =================================================================================
+// CONTROL STRUCTURE
+// =================================================================================
+
+void controlStructure(): { }
+{
+	conditional()
+	| loop()
+	| repeatTimes()  
+}
+
+void loop(): { }
+{
+  < DO > (condition() | not()) < THEN >
+}
+
+void repeatTimes(): { }
+{
+  < REP > value() < TIMES > block() < PER >
+}
+
+// =================================================================================
+// CONDITIONALS
+// =================================================================================
+
+void conditional(): { }
+{
+  < IF > <LPAREN > (condition() | not()) < RPAREN >
+  < THEN > block() < ELSE > block() <FI >
+}
+
+void condition(): { }
+{
+	  isBlocked()
+	| isFacing()
+	| zero()
+}
+
+
+
+void isBlocked(): { }
+{
+  < ISBLOCKED > <LPAREN > direction() < RPAREN >
+}
+
+void isFacing(): { }
+{
+  < ISFACING > <LPAREN > orientation() < RPAREN >
+}
+
+void zero(): { }
+{
+  < ZERO > <LPAREN > value() < RPAREN >
+}
+
+
+void not(): { }
+{
+  < NOT > <LPAREN > condition() < RPAREN >
+}
+
+// =================================================================================
+// VARIABLES
+// =================================================================================
+
+void variableDefinition(): { Token x;}
+{
+	<VAR > x = <IDENTIFIER > <EQUALS > value()
+}
+
+void variable(): { }
+{
+	< NOP >
+}
+
+// =================================================================================
+// MACROS
+// =================================================================================
+
+void macroDefinition(): { Token x; }
+{
+	<MACRO > x = < IDENTIFIER > <LPAREN > paramsDef() <RPAREN > block()
+}
+
+void macroInvocation(): { Token macro;}
+{
+	macro = < IDENTIFIER > <LPAREN > paramsCall() <RPAREN >
+}
+
+void paramsDef(): { }
+{
+	< IDENTIFIER > (<COMMA > <IDENTIFIER >)*
+}
+
+void paramsCall(): { }
+{
+	value() (<COMMA > value())*
+}
+
+
+// =================================================================================
+// VALUE
+// =================================================================================
+
+void value(): { }
+{
+	num()
+	| variable()
+	| constant()
+}
+
+void constant(): { }
+{
+   < SIZE >
+ | < MYX >
+ | < MYY >
+ | < MYCHIPS >
+ | < MYBALLOONS >
+ | < BALLOONSHERE >
+ | < CHIPSHERE >
+ | < ROOMFORCHIPS >
+}
+
+// =================================================================================
+// DIRECTIONS
+// =================================================================================
+
+void directions(): { }
+{
+  direction() (< COMMA > direction())*
+}
+
+void direction(): { }
+{
+	< LEFT > < RIGHT > < BACK >
+}
+
+void orientation(): { }
+{
+	< NORTH > |	< EAST > | < SOUTH > | < WEST >
+}
+
+	
