@@ -1,4 +1,4 @@
-Gramatica para el Robot:
+# Gramatica para el Robot
 Autor: Alejandro Arango
 Modificado por: Silvia Takahashi
 Modificado por: Juan Pablo Morales.
