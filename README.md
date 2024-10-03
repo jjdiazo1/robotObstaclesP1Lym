@@ -87,3 +87,7 @@ EXEC {
   PICK(BALLOONS, 1);
 }
 ```
+
+## Consejos para el estudiante
+Si tu que lees esto estas viendo este curso por primera vez, por favor **NO COPIES** este repositorio, lo dejé como una guía porque sentí que no se explicaba muy bien lo que tocaba hacer en el proyecto. Es muy simple lo que tienes que hacer solo concentrate en las clases principales que describí arriba para modificar el parser y guíate si quieres de como se manejan los metodos en JavaCC con el archivo `Robot.jj` de este repositorio, de ahí está el éxito en este proyecto, en si lo puedes conectar al robot mediante el objeto world que está ya en la clase `Robot.jj` del esqueleto, ánimo.
+
