@@ -1,0 +1,1119 @@
+/*
+Gramatica para el Robot:
+Autor: Alejandro Arango
+Modificado por: Silvia Takahashi
+Modificado por: Juan Pablo Morales.
+Agregadas producciones para manejar globos
+Modificado por Silvia Takahashi
+Modificado por Juan Jose Diaz y Simon Calderon
+**/
+
+options 
+{
+    LOOKAHEAD=1; 
+    IGNORE_CASE=true;
+    STATIC = false;
+}
+
+PARSER_BEGIN(Robot)
+
+package uniandes.lym.robot.control;
+
+import uniandes.lym.robot.kernel.*;
+import uniandes.lym.robot.view.Console;
+
+import java.awt.Point;
+import java.io.*;
+import java.util.*;
+
+@SuppressWarnings("serial")
+public class Robot 
+{
+
+	// =================================================================================
+	// TABLAS
+	// =================================================================================
+	  	
+    // Tabla de variables (almacena nombres y valores)
+    public HashMap<String,Integer> variables = new HashMap<String,Integer>();
+  
+    // Tabla de procedimientos (MACROS) (almacena nombres y parámetros)
+    public HashMap<String, Macro> macros = new HashMap<String, Macro>();
+    
+    // Objeto para controlar todo
+    private RobotWorldDec world;
+
+    void setWorld(RobotWorld w) {
+        world = (RobotWorldDec) w; 
+    }
+
+    // =================================================================================
+	// METODOS PARA OBTENER DIRECCIONES Y ORIENTACIONES DEL ROBOT
+	// =================================================================================
+
+    // Para obtener la dirección numérica basada en el string
+    public int getDirection(String dir) {
+	    int facing = world.getFacing(); // Orientación actual del robot
+	    int absoluteDir;
+	
+	    switch (dir.toLowerCase()) {
+	        case "front":
+	            absoluteDir = facing;
+	            break;
+	        case "left":
+	            absoluteDir = (facing + 270) % 360;
+	            break;
+	        case "right":
+	            absoluteDir = (facing + 90) % 360;
+	            break;
+	        case "back":
+	            absoluteDir = (facing + 180) % 360;
+	            break;
+	        default:
+	            throw new IllegalArgumentException("Invalid direction: " + dir);
+    }
+
+    // Convertir el ángulo a una de las constantes de dirección
+    switch (absoluteDir) {
+        case 0:
+            return RobotWorld.NORTH;
+        case 90:
+            return RobotWorld.EAST;
+        case 180:
+            return RobotWorld.SOUTH;
+        case 270:
+            return RobotWorld.WEST;
+        default:
+            throw new IllegalArgumentException("Invalid absolute direction calculated: " + absoluteDir);
+    }
+} 
+
+
+    // Para verificar si el robot está mirando hacia una orientación
+    public boolean getFacing(String ori) {
+        switch (ori.toLowerCase()) {
+            case "north":
+                return world.facingNorth();
+            case "south":
+                return world.facingSouth();
+            case "east":
+                return world.facingEast();
+            case "west":
+                return world.facingWest();
+            default:
+                throw new IllegalArgumentException("Invalid orientation: " + ori);
+        }
+    }
+
+    // Para obtener la orientación numérica
+    public int getOrientation(String ori) {
+        switch (ori.toLowerCase()) {
+            case "north":
+                return RobotWorld.NORTH;
+            case "south":
+                return RobotWorld.SOUTH;
+            case "east":
+                return RobotWorld.EAST;
+            case "west":
+                return RobotWorld.WEST;
+            default:
+                throw new IllegalArgumentException("Invalid orientation: " + ori);
+        }
+    }
+
+    String salida = new String();
+
+    // =================================================================================
+	// CLASES PARA REPRESENTAR INSTRUCCIONES
+	// =================================================================================
+	  	
+    abstract class Instruction {
+        abstract void execute() throws ParseException;
+    }
+
+    class CommandInstruction extends Instruction {
+        String command;
+        List<Expression> args;
+
+        CommandInstruction(String command, List<Expression> args) {
+            this.command = command;
+            this.args = args;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            switch (command) {
+                case "walk":
+                    int steps = args.get(0).evaluate();
+                    world.moveForward(steps, false);
+                    break;
+                case "jump":
+                    steps = args.get(0).evaluate();
+                    world.moveForward(steps, true);
+                    break;
+                case "drop":
+                    int n = args.get(0).evaluate();
+                    world.putChips(n);
+                    break;
+                case "grab":
+                    n = args.get(0).evaluate();
+                    world.grabBalloons(n);
+                    break;
+                case "letgo":
+                    n = args.get(0).evaluate();
+                    world.putBalloons(n);
+                    break;
+                case "pop":
+                    n = args.get(0).evaluate();
+                    world.popBalloons(n);
+                    break;
+                case "turntomy":
+                    String dir = ((StringExpression) args.get(0)).value;
+                    if (dir.equalsIgnoreCase("left")) {
+                        world.turnRight();
+                        world.turnRight();
+                        world.turnRight();
+                    } else if (dir.equalsIgnoreCase("right")) {
+                        world.turnRight();
+                    } else if (dir.equalsIgnoreCase("back")) {
+                        world.turnRight();
+                        world.turnRight();
+                    }
+                    break;
+                case "turntothe":
+                    String orientation = ((StringExpression) args.get(0)).value;
+                    int desiredOrientation = getOrientation(orientation);
+                    while (world.getFacing() != desiredOrientation) {
+                        world.turnRight();
+                    }
+                    break;
+                case "moves":
+                    for (Expression expr : args) {
+                        dir = ((StringExpression) expr).value;
+                        if (dir.equalsIgnoreCase("forward")) {
+                            world.moveForward(1, false);
+                        } else if (dir.equalsIgnoreCase("left")) {
+                            world.turnRight();
+                            world.turnRight();
+                            world.turnRight();
+                            world.moveForward(1, false);
+                            world.turnRight();
+                        } else if (dir.equalsIgnoreCase("right")) {
+                            world.turnRight();
+                            world.moveForward(1, false);
+                            world.turnRight();
+                            world.turnRight();
+                            world.turnRight();
+                        } else if (dir.equalsIgnoreCase("backwards")) {
+                            world.turnRight();
+                            world.turnRight();
+                            world.moveForward(1, false);
+                            world.turnRight();
+                            world.turnRight();
+                        }
+                    }
+                    break;
+                case "right":
+                    world.turnRight();
+                    salida = "Command: Right";
+                    break;
+                case "move":
+                    steps = args.get(0).evaluate();
+                    world.moveForward(steps, false);
+                    salida = "Command: Move " + steps;
+                    break;
+                case "hop":
+                    steps = args.get(0).evaluate();
+                    world.moveForward(steps, true);
+                    salida = "Command: Hop " + steps;
+                    break;
+                case "go":
+                    int x = args.get(0).evaluate();
+                    int y = args.get(1).evaluate();
+                    world.setPostion(x, y);
+                    salida = "Command: Go to (" + x + ", " + y + ")";
+                    break;
+                case "put":
+                    String material = ((StringExpression) args.get(0)).value;
+                    n = args.get(1).evaluate();
+                    if (material.equalsIgnoreCase("chips")) {
+                        world.putChips(n);
+                        salida = "Command: Put Chips " + n;
+                    } else if (material.equalsIgnoreCase("balloons")) {
+                        world.putBalloons(n);
+                        salida = "Command: Put Balloons " + n;
+                    }
+                    break;
+                case "pick":
+                    material = ((StringExpression) args.get(0)).value;
+                    n = args.get(1).evaluate();
+                    if (material.equalsIgnoreCase("chips")) {
+                        world.pickChips(n);
+                        salida = "Command: Pick Chips " + n;
+                    } else if (material.equalsIgnoreCase("balloons")) {
+                        world.grabBalloons(n);
+                        salida = "Command: Pick Balloons " + n;
+                    }
+                    break;
+                case "nop":
+                    // No hacer nada
+                    break;
+                default:
+                    throw new ParseException("Comando desconocido: " + command);
+            }
+        }
+    }
+
+    class VariableAssignmentInstruction extends Instruction {
+        String variableName;
+        Expression value;
+
+        VariableAssignmentInstruction(String variableName, Expression value) {
+            this.variableName = variableName;
+            this.value = value;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            int val = value.evaluate();
+            variables.put(variableName, val);
+        }
+    }
+
+    class BlockInstruction extends Instruction {
+        List<Instruction> instructions;
+
+        BlockInstruction(List<Instruction> instructions) {
+            this.instructions = instructions;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            for (Instruction instr : instructions) {
+                instr.execute();
+            }
+        }
+    }
+
+    class MacroDefinitionInstruction extends Instruction {
+        String macroName;
+        List<String> parameters;
+        List<Instruction> instructions;
+
+        MacroDefinitionInstruction(String macroName, List<String> parameters, List<Instruction> instructions) {
+            this.macroName = macroName;
+            this.parameters = parameters;
+            this.instructions = instructions;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            Macro macro = new Macro(macroName, parameters, instructions);
+            macros.put(macroName, macro);
+        }
+    }
+
+    class MacroInvocationInstruction extends Instruction {
+        String macroName;
+        List<Expression> arguments;
+
+        MacroInvocationInstruction(String macroName, List<Expression> arguments) {
+            this.macroName = macroName;
+            this.arguments = arguments;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            Macro macro = macros.get(macroName);
+            if (macro == null) {
+                throw new ParseException("Macro no definida: " + macroName);
+            }
+            if (arguments.size() != macro.parameters.size()) {
+                throw new ParseException("Número incorrecto de argumentos para la macro: " + macroName);
+            }
+            // Guardar variables actuales
+            Map<String, Integer> oldVariables = new HashMap<>(variables);
+            // Asignar argumentos a parámetros
+            for (int i = 0; i < arguments.size(); i++) {
+                int argValue = arguments.get(i).evaluate();
+                variables.put(macro.parameters.get(i), argValue);
+            }
+            // Ejecutar instrucciones de la macro
+            for (Instruction instr : macro.instructions) {
+                instr.execute();
+            }
+            // Restaurar variables
+            variables = new HashMap<>(oldVariables);
+        }
+    }
+
+    class ConditionalInstruction extends Instruction {
+        Condition condition;
+        List<Instruction> thenInstructions;
+        List<Instruction> elseInstructions;
+
+        ConditionalInstruction(Condition condition, List<Instruction> thenInstructions, List<Instruction> elseInstructions) {
+            this.condition = condition;
+            this.thenInstructions = thenInstructions;
+            this.elseInstructions = elseInstructions;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            if (condition.evaluate()) {
+                for (Instruction instr : thenInstructions) {
+                    instr.execute();
+                }
+            } else if (elseInstructions != null) {
+                for (Instruction instr : elseInstructions) {
+                    instr.execute();
+                }
+            }
+        }
+    }
+
+    class LoopInstruction extends Instruction {
+        Condition condition;
+        List<Instruction> bodyInstructions;
+
+        LoopInstruction(Condition condition, List<Instruction> bodyInstructions) {
+            this.condition = condition;
+            this.bodyInstructions = bodyInstructions;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            while (condition.evaluate()) {
+                for (Instruction instr : bodyInstructions) {
+                    instr.execute();
+                }
+            }
+        }
+    }
+
+    class RepeatInstruction extends Instruction {
+        int times;
+        List<Instruction> bodyInstructions;
+
+        RepeatInstruction(int times, List<Instruction> bodyInstructions) {
+            this.times = times;
+            this.bodyInstructions = bodyInstructions;
+        }
+
+        @Override
+        void execute() throws ParseException {
+            for (int i = 0; i < times; i++) {
+                for (Instruction instr : bodyInstructions) {
+                    instr.execute();
+                }
+            }
+        }
+    }
+
+	// Clase para ejecutar comandos de forma segura
+	class SafeExeInstruction extends Instruction {
+        Instruction instr;
+    
+        SafeExeInstruction(Instruction instr) {
+            this.instr = instr;
+        }
+    
+        @Override
+        void execute() throws ParseException {
+            try {
+                instr.execute();
+            } catch (Exception e) {
+                salida = ("SafeExe: comando no ejecutado debido a un error: " + e.getMessage());
+            }
+        }
+    }
+    
+
+ 	// =================================================================================
+	// CLASES PARA REPRESENTAR EXPRESIONES
+	// =================================================================================
+	    abstract class Expression {
+        abstract int evaluate() throws ParseException;
+    }
+
+    class NumberExpression extends Expression {
+        int value;
+
+        NumberExpression(int value) {
+            this.value = value;
+        }
+
+        @Override
+        int evaluate() {
+            return value;
+        }
+    }
+
+    class VariableExpression extends Expression {
+        String name;
+
+        VariableExpression(String name) {
+            this.name = name;
+        }
+
+        @Override
+        int evaluate() throws ParseException {
+            Integer val = variables.get(name);
+            if (val == null) {
+                throw new ParseException("Variable no definida: " + name);
+            }
+            return val;
+        }
+    }
+
+    class ConstantExpression extends Expression {
+        int value;
+
+        ConstantExpression(int value) {
+            this.value = value;
+        }
+
+        @Override
+        int evaluate() {
+            return value;
+        }
+    }
+
+    class StringExpression extends Expression {
+        String value;
+
+        StringExpression(String value) {
+            this.value = value;
+        }
+
+        @Override
+        int evaluate() throws ParseException {
+            throw new ParseException("No se puede evaluar una cadena como número");
+        }
+    }
+
+	// =================================================================================
+	// CLASES PARA REPRESENTAR CONDICIONES
+	// =================================================================================
+
+	    abstract class Condition {
+        abstract boolean evaluate() throws ParseException;
+    }
+
+    class IsBlockedCondition extends Condition {
+        String direction;
+
+        IsBlockedCondition(String direction) {
+            this.direction = direction;
+        }
+
+        @Override
+        boolean evaluate() throws ParseException {
+            return world.blockedInRange(world.getPosition().x, world.getPosition().y, 1, getDirection(direction));
+        }
+    }
+
+    class IsFacingCondition extends Condition {
+        String orientation;
+
+        IsFacingCondition(String orientation) {
+            this.orientation = orientation;
+        }
+
+        @Override
+        boolean evaluate() throws ParseException {
+            return getFacing(orientation);
+        }
+    }
+
+    class ZeroCondition extends Condition {
+        Expression expr;
+
+        ZeroCondition(Expression expr) {
+            this.expr = expr;
+        }
+
+        @Override
+        boolean evaluate() throws ParseException {
+            return expr.evaluate() == 0;
+        }
+    }
+
+    class NotCondition extends Condition {
+        Condition condition;
+
+        NotCondition(Condition condition) {
+            this.condition = condition;
+        }
+
+        @Override
+        boolean evaluate() throws ParseException {
+            return !condition.evaluate();
+        }
+    }
+
+ 	// =================================================================================
+	// CLASES PARA REPRESENTAR MACROS
+	// =================================================================================
+	    class Macro {
+        String name;
+        List<String> parameters;
+        List<Instruction> instructions;
+
+        Macro(String name, List<String> parameters, List<Instruction> instructions) {
+            this.name = name;
+            this.parameters = parameters;
+            this.instructions = instructions;
+        }
+    }
+}
+
+// =================================================================================
+// TOKENS
+// =================================================================================
+
+	
+PARSER_END(Robot)
+
+/* Ignorar espacios en blanco y saltos de línea */
+SKIP:
+{
+    " "
+  | "\r"
+  | "\t"
+  | "\n"
+}
+
+/* Definición de tokens */
+TOKEN: /* Nombres de Comandos */
+{
+    <MOV:  "Move">
+  | <RIGHT: "RIGHT">
+  | <PUT: "Put">
+  | <PICK: "Pick">
+  | <POP: "Pop">
+  | <HOP: "HOP">     
+  | <GO: "GO">
+}
+
+TOKEN: /* Nombres de Comandos Extras */
+{
+    <NOT: "not">
+  | <SAFEEXEC: "safeExe">
+  | <WALK: "walk">
+  | <JUMP: "jump">
+  | <DROP: "drop">
+  | <GRAB: "grab">
+  | <LETGO: "letgo">
+  | <TURNTOMY: "turntomy">
+  | <TURNTOTHE: "turntothe">
+  | <MOVES: "moves">
+  | <NOP: "nop">
+  | <SIZE: "size">
+  | <MYX: "myx">
+  | <MYY: "myy">
+  | <MYCHIPS: "mychips">
+  | <MYBALLOONS: "myballoons">
+  | <BALLOONSHERE: "balloonshere">
+  | <CHIPSHERE: "chipsHere">
+  | <ROOMFORCHIPS: "roomforchips">
+  | <ISBLOCKED: "isBlocked?">
+  | <ISFACING: "isFacing?">
+  | <ZERO: "zero?">
+}
+
+TOKEN: /* Direcciones */
+{
+  <LEFT: "left">
+| <BACK: "back">
+| <NORTH: "north">
+| <EAST: "east">
+| <SOUTH: "south">
+| <WEST: "west">
+| <FORWARD: "forward">
+| <BACKWARDS: "backwards">
+}
+
+TOKEN:
+{
+    <BALLOONS: "BALLOONS">
+  | <CHIPS: "CHIPS">
+}
+
+TOKEN :
+{
+    <EXEC: "EXEC">
+  | <NEW: "NEW">
+  | <VAR: "VAR">
+  | <MACRO: "MACRO">
+  | <IF: "if">
+  | <THEN: "then">
+  | <ELSE: "else">
+  | <FI: "fi">
+  | <DO: "do">
+  | <OD: "od">
+  | <REP: "rep">
+  | <TIMES: "times">
+  | <PER: "per">
+  | <LPAREN: "(">
+  | <RPAREN: ")">
+  | <LBRACE: "{">
+  | <RBRACE: "}">
+  | <COMMA: ",">
+  | <SEMICOLON: ";">
+  | <EQUALS: "=">
+  | <IDENTIFIER: (["a"-"z", "A"-"Z"])(["a"-"z", "A"-"Z", "0"-"9"])*>
+}
+
+TOKEN :
+{
+    <NUM: (<DIGIT>)+>
+  | <#DIGIT: ["0"-"9"]>
+}
+
+
+// =================================================================================
+// INICIO DEL PROGRAMA
+// =================================================================================
+
+boolean command(Console sistema): { Instruction instr; String salida; }
+{
+    (
+        (
+            instr = program()
+        )
+        {
+            try {
+                instr.execute();
+                salida = "Comando ejecutado";
+            } catch (Exception e) {
+                salida = "Error en la ejecución del comando: " + e.getMessage();
+            }
+            // Pausa para observar la ejecución
+            try {
+                Thread.sleep(900);
+            } catch (InterruptedException e) {
+                System.err.format("IOException: %s%n", e);
+            }
+            sistema.printOutput(salida);
+            return true;
+        }
+    )+
+    | <EOF> { return false; }
+}
+
+
+Instruction program(): { Instruction instr; }
+{
+    instr = executionCommand()
+    { return instr; } |
+    instr = definition() 
+    { return instr; }
+}
+
+// =================================================================================
+// EXEC
+// =================================================================================
+
+Instruction executionCommand(): { List<Instruction> instructions; }
+{
+    <EXEC> instructions = block()
+    {
+        return new BlockInstruction(instructions);
+    }
+}
+
+// =================================================================================
+// DEFINICIONES
+// =================================================================================
+
+Instruction definition(): { Instruction instr; }
+{
+    <NEW> (
+        instr = variableDefinition()
+      | instr = macroDefinition()
+    )
+    { return instr; }
+}
+
+// =================================================================================
+// INSTRUCCIONES, COMANDOS Y BLOQUES DE INSTRUCCIONES
+// =================================================================================
+
+List<Instruction> block(): { List<Instruction> instructions = new ArrayList<>(); Instruction instr; }
+{
+    <LBRACE> (
+        instr = instruction() <SEMICOLON>
+        { instructions.add(instr); }
+    )+ <RBRACE>
+    { return instructions; }
+}
+
+Instruction instruction(): { Instruction instr; }
+{
+    instr = comando()
+    { return instr; }
+  | instr = controlStructure()
+    { return instr; }
+}
+
+
+Instruction comando(): { Instruction instr; }
+{
+    instr = variableDefinition() { return instr; }
+  | instr = macroInvocation() { return instr; }
+  | instr = turnToMy() { return instr; }
+  | instr = turnToThe() { return instr; }
+  | instr = simpleCommand() { return instr; }
+  | instr = moves() { return instr; }
+  | instr = nop() { return instr; }
+  | instr = safeExe() { return instr; }
+}
+
+Instruction simpleCommand(): { Token cmdToken; Expression expr = null; Expression expr2 = null; Instruction paramInstr = null;
+}
+{
+    (
+        cmdToken = <WALK> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <JUMP> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <DROP> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <GRAB> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <LETGO> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <POP> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <RIGHT> <LPAREN> <RPAREN>
+      | cmdToken = <MOV> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <HOP> <LPAREN> expr = value() <RPAREN>
+      | cmdToken = <GO> <LPAREN> expr = value() <COMMA> expr2 = value() <RPAREN>
+      | cmdToken = <PUT> <LPAREN> paramInstr = putParams() <RPAREN>
+      | cmdToken = <PICK> <LPAREN> paramInstr = pickParams() <RPAREN>
+    )
+    {
+        // Dependiendo del comando, crear la instruccion adecuada porque unos tienen 1 parametro y otros 2
+        if (cmdToken.kind == WALK || cmdToken.kind == JUMP || cmdToken.kind == DROP
+            || cmdToken.kind == GRAB || cmdToken.kind == LETGO || cmdToken.kind == POP
+            || cmdToken.kind == MOV || cmdToken.kind == HOP) {
+            return new CommandInstruction(cmdToken.image.toLowerCase(), Arrays.asList(expr));
+        } else if (cmdToken.kind == RIGHT) {
+            return new CommandInstruction(cmdToken.image.toLowerCase(), new ArrayList<>());
+        } else if (cmdToken.kind == GO) {
+            return new CommandInstruction(cmdToken.image.toLowerCase(), Arrays.asList(expr, expr2));
+        } else if (cmdToken.kind == PUT || cmdToken.kind == PICK) {
+            return paramInstr;
+        } else {
+            throw new ParseException("Comando desconocido: " + cmdToken.image);
+        }
+    }
+}
+
+/* Parámetros para PUT */
+Instruction putParams(): { String material; Expression expr; Instruction paramInstr;
+}
+{
+    material = materialType() <COMMA> expr = value()
+    {
+        paramInstr = new CommandInstruction("put", Arrays.asList(new StringExpression(material), expr));
+        return paramInstr;
+    }
+}
+
+/* Parámetros para PICK */
+Instruction pickParams(): { String material; Expression expr;Instruction paramInstr;
+ }
+{
+    material = materialType() <COMMA> expr = value()
+    {
+        paramInstr = new CommandInstruction("pick", Arrays.asList(new StringExpression(material), expr));
+		return paramInstr;
+    }
+}
+
+/* Tipo de material */
+String materialType(): { Token matToken; }
+{
+     ( matToken = <CHIPS>
+     | matToken = <BALLOONS>)
+    { return matToken.image.toLowerCase(); }
+}
+
+/* TurnToMy */
+Instruction turnToMy(): { Token cmdToken; String dir; }
+{
+    cmdToken = <TURNTOMY> <LPAREN> dir = direction() <RPAREN>
+    {
+        return new CommandInstruction(cmdToken.image.toLowerCase(), Arrays.asList(new StringExpression(dir)));
+    }
+}
+
+/* TurnToThe */
+Instruction turnToThe(): { Token cmdToken; String ori; }
+{
+    cmdToken = <TURNTOTHE> <LPAREN> ori = orientation() <RPAREN>
+    {
+        return new CommandInstruction(cmdToken.image.toLowerCase(), Arrays.asList(new StringExpression(ori)));
+    }
+}
+
+/* Moves */
+Instruction moves(): { Token cmdToken; List<Expression> args; }
+{
+    cmdToken = <MOVES> <LPAREN> args = directionsList() <RPAREN>
+    {
+        return new CommandInstruction(cmdToken.image.toLowerCase(), args);
+    }
+}
+
+
+/* NOP */
+Instruction nop(): { Token cmdToken; }
+{
+    cmdToken = <NOP>
+    {
+        return new CommandInstruction(cmdToken.image.toLowerCase(), new ArrayList<>());
+    }
+}
+
+/* SafeExe */
+Instruction safeExe(): { Instruction instr; }
+{
+    <SAFEEXEC> <LPAREN> instr = simpleCommand() <RPAREN>
+    {
+        return new SafeExeInstruction(instr);
+    }
+}
+
+// =================================================================================
+// ESTRUCTURAS DE CONTROL
+// =================================================================================
+
+Instruction controlStructure(): { Instruction instr; }
+{
+    instr = conditional() { return instr; }
+  | instr = loop() { return instr; }
+  | instr = repeatTimes() { return instr; }
+}
+
+// =================================================================================
+// BUCLES
+// =================================================================================
+
+Instruction loop(): { Condition cond; List<Instruction> bodyInstrs; }
+{
+    <DO> <LPAREN> cond = condition() <RPAREN> bodyInstrs = block() <OD>
+    {
+        return new LoopInstruction(cond, bodyInstrs);
+    }
+}
+
+Instruction repeatTimes(): { Expression timesExpr; List<Instruction> bodyInstrs; }
+{
+    <REP> timesExpr = value() <TIMES> bodyInstrs = block() <PER>
+    {
+        int times = timesExpr.evaluate();
+        return new RepeatInstruction(times, bodyInstrs);
+    }
+}
+
+// =================================================================================
+// CONDICIONALES
+// =================================================================================
+
+Instruction conditional(): { Condition cond; List<Instruction> thenInstrs; List<Instruction> elseInstrs = null; }
+{
+    <IF> <LPAREN> cond = condition() <RPAREN> <THEN> thenInstrs = block()
+    [ <ELSE> elseInstrs = block() ]
+    <FI>
+    {
+        return new ConditionalInstruction(cond, thenInstrs, elseInstrs);
+    }
+}
+
+/* Condición */
+Condition condition(): { Condition cond; }
+{
+    cond = isBlocked() { return cond; }
+  | cond = isFacing() { return cond; }
+  | cond = zero() { return cond; }
+  | cond = not() { return cond; }
+}
+
+/* isBlocked */
+Condition isBlocked(): { String dir; }
+{
+    <ISBLOCKED> <LPAREN> dir = direction() <RPAREN>
+    {
+        return new IsBlockedCondition(dir);
+    }
+}
+
+/* isFacing */
+Condition isFacing(): { String ori; }
+{
+    <ISFACING> <LPAREN> ori = orientation() <RPAREN>
+    {
+        return new IsFacingCondition(ori);
+    }
+}
+
+/* zero */
+Condition zero(): { Expression expr; }
+{
+    <ZERO> <LPAREN> expr = value() <RPAREN>
+    {
+        return new ZeroCondition(expr);
+    }
+}
+
+/* not */
+Condition not(): { Condition cond; }
+{
+    <NOT> <LPAREN> cond = condition() <RPAREN>
+    {
+        return new NotCondition(cond);
+    }
+}
+
+// =================================================================================
+// DEFINICIONES DE VARIABLES Y MACROS
+// =================================================================================
+
+/* Definición de variable */
+Instruction variableDefinition(): { Token varToken; Expression expr; }
+{
+    <VAR> varToken = <IDENTIFIER> <EQUALS> expr = value()
+    {
+        return new VariableAssignmentInstruction(varToken.image.toLowerCase(), expr);
+    }
+}
+
+/* Definición de macro */
+Instruction macroDefinition(): { Token macroNameToken; List<String> paramNames = new ArrayList<>(); List<Instruction> instructions; }
+{
+    <MACRO> macroNameToken = <IDENTIFIER> <LPAREN> [ paramsDef(paramNames) ] <RPAREN> instructions = block()
+    {
+        return new MacroDefinitionInstruction(macroNameToken.image.toLowerCase(), paramNames, instructions);
+    }
+}
+
+// =================================================================================
+// LLAMADAS A MACROS
+// =================================================================================
+
+/* Llamada a macro */
+Instruction macroInvocation(): { Token macroNameToken; List<Expression> args; }
+{
+    macroNameToken = <IDENTIFIER> <LPAREN> args = paramsCall() <RPAREN>
+    {
+        return new MacroInvocationInstruction(macroNameToken.image.toLowerCase(), args);
+    }
+}
+
+/* Definición de parámetros */
+void paramsDef(List<String> paramNames): { Token paramToken; }
+{
+    paramToken = <IDENTIFIER> { paramNames.add(paramToken.image.toLowerCase()); }
+    ( <COMMA> paramToken = <IDENTIFIER> { paramNames.add(paramToken.image.toLowerCase()); } )*
+}
+
+/* Llamada de parámetros */
+List<Expression> paramsCall(): { List<Expression> args = new ArrayList<>(); Expression expr; }
+{
+    [ expr = value() { args.add(expr); }
+      ( <COMMA> expr = value() { args.add(expr); } )*
+    ]
+    { return args; }
+}
+
+// =================================================================================
+// DIRECCIONES Y ORIENTACIONES
+// =================================================================================
+
+/* Lista de direcciones */
+List<Expression> directionsList(): { List<Expression> args = new ArrayList<>(); String dir; }
+{
+    dir = directionMove() { args.add(new StringExpression(dir)); }
+    ( <COMMA> dir = directionMove() { args.add(new StringExpression(dir)); } )*
+    { return args; }
+}
+
+/* Dirección de movimiento */
+String directionMove(): { Token dirToken; }
+{
+    (
+        dirToken =  <LEFT>
+      | dirToken =  <RIGHT>
+      | dirToken =  <FORWARD>
+      | dirToken = <BACKWARDS>
+    )
+    { return dirToken.image.toLowerCase(); }
+}
+
+/* Dirección */
+String direction(): { Token dirToken; }
+{
+     (
+        dirToken = <LEFT>
+      | dirToken = <RIGHT>
+      | dirToken = <BACK>
+    )
+    { return dirToken.image.toLowerCase(); }
+}
+
+/* Orientación */
+String orientation(): { Token orientToken; }
+{
+     (
+        orientToken =<NORTH>
+      | orientToken =<EAST>
+      | orientToken =<SOUTH>
+      | orientToken =<WEST>
+    )
+    { return orientToken.image.toLowerCase(); }
+}
+
+// =================================================================================
+// VALORES
+// =================================================================================
+
+/* Valor */
+Expression value(): { Expression expr; }
+{
+    expr = num() { return expr; }
+  | expr = variable() { return expr; }
+  | expr = constant() { return expr; }
+}
+
+/* Número */
+Expression num(): { int val; }
+{
+    <NUM>
+    {
+        try {
+            val = Integer.parseInt(token.image);
+            return new NumberExpression(val);
+        } catch (NumberFormatException e) {
+            throw new ParseException("Número fuera de rango: " + token.image);
+        }
+    }
+}
+
+/* Variable */
+Expression variable(): { Token varToken; }
+{
+    varToken = <IDENTIFIER>
+    {
+        return new VariableExpression(varToken.image.toLowerCase());
+    }
+}
+
+/* Constante */
+Expression constant(): { int val; }
+{
+    <SIZE> { val = world.getN(); return new ConstantExpression(val); }
+  | <MYX> { val = world.getPosition().x; return new ConstantExpression(val); }
+  | <MYY> { val = world.getPosition().y; return new ConstantExpression(val); }
+  | <MYCHIPS> { val = world.getMyChips(); return new ConstantExpression(val); }
+  | <MYBALLOONS> { val = world.getMyBalloons(); return new ConstantExpression(val); }
+  | <BALLOONSHERE> { val = world.countBalloons(); return new ConstantExpression(val); }
+  | <CHIPSHERE> { val = world.chipExists() ? 1 : 0; return new ConstantExpression(val); }
+  | <ROOMFORCHIPS> { val = world.chipExists() ? 0 : 1; return new ConstantExpression(val); }
+}
