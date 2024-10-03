@@ -18,6 +18,9 @@ El proyecto está organizado en tres paquetes principales:
 - uniandes.lym.robot.kernel: Incluye las clases que representan la lógica y el estado del mundo del robot.
 - uniandes.lym.robot.view: Contiene las clases responsables de la interfaz gráfica y la visualización.
 
+### Diagrama UML
+![mermaid-diagram-2024-10-03-232504](https://github.com/user-attachments/assets/057ec0cd-60f8-4807-8ea7-df02c13a35e3)
+
 ### Clases principales
 #### Robot (uniandes.lym.robot.control.Robot)
 Esta clase es el núcleo del intérprete de comandos del robot. Está generada a partir del archivo Robot.jj utilizando JavaCC. Algunas de sus responsabilidades incluyen:
@@ -34,9 +37,6 @@ Proporciona la interfaz de usuario para interactuar con el robot. Algunas de sus
 - Entrada de comandos: Permite al usuario ingresar comandos para controlar el robot.
 - Visualización: Muestra el estado actual del mundo y del robot utilizando las clases Board e Images.
 - Salida de mensajes: Presenta mensajes de salida y resultados de la ejecución de comandos mediante la string salida que se pasa al interprete y al robot.jj
-
-## Diagrama
-![mermaid-diagram-2024-10-03-232504](https://github.com/user-attachments/assets/057ec0cd-60f8-4807-8ea7-df02c13a35e3)
 
 ## Comandos Disponibles
 Despúes de haber modificado el robot
