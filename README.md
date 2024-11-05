@@ -11,7 +11,7 @@
 ## Descripción General
 El proyecto Robot es una aplicación que simula un robot en un mundo virtual. El robot puede moverse, recoger y colocar objetos, y realizar diversas acciones basadas en comandos definidos por el usuario. La aplicación incluye un intérprete de comandos y una interfaz gráfica para visualizar el estado del robot y su entorno.
 
-<img width="350" alt="Screenshot 2024-11-05 at 11 26 01 AM" src="https://github.com/user-attachments/assets/72e2bb9d-2922-4752-b174-c1725d6198fb">
+<img width="200" alt="Screenshot 2024-11-05 at 11 26 01 AM" src="https://github.com/user-attachments/assets/72e2bb9d-2922-4752-b174-c1725d6198fb">
 
 
 ## Estructura del Proyecto
